@@ -176,6 +176,34 @@ class DealButton:
 
         return False
 
+# traditionally you show the completed series with a king from
+# the respective suit
+# but we're cheap here
+class CompletedLabel:
+    def __init__(self, current_suits):
+        self.suits = { suit: 0 for suit in range(current_suits) }
+        self.width = g_element_width * 2
+        self.height = g_font_size * (current_suits + 1) + g_gap_size
+
+        self.x_pos = g_gap_size
+        self.y_pos = g_window_height - self.height - g_gap_size
+
+    def complete(self, suit):
+        self.suits[suit] += 1
+
+    def draw(self):
+        text = "Completed:\n"
+
+        for index, n in self.suits.items():
+            text += f"{suits[index]}: {n}\n"
+
+        text = text.encode("utf-8")
+
+        rl.DrawRectangle(self.x_pos, self.y_pos, self.width, self.height, rl.GRAY)
+        rl.DrawRectangleLines(self.x_pos, self.y_pos, self.width, self.height, rl.BLACK)
+
+        rl.DrawText(text, self.x_pos + 1, self.y_pos + 1, g_font_size, rl.WHITE)
+
 def generate_standard_deck(nSuits):
     global suits
     global ranks
@@ -210,11 +238,28 @@ def shuffle(deck):
 
 # for picking up multiple cards
 def is_valid_series(cards):
-    for i in range(len(cards) - 1):
-        if cards[i].suit != cards[i + 1].suit or cards[i].rank - 1 != cards[i + 1].rank:
-            return False
+    if len(cards) > 1:
+        for i in range(len(cards) - 1):
+            if cards[i].suit != cards[i + 1].suit or cards[i].rank - 1 != cards[i + 1].rank:
+                return False
 
     return True
+
+def check_holders_complete_series(card_holders):
+    for ch in card_holders:
+        current_series = 1
+
+        for ci in range(len(ch.cards) - 1, 0, -1):
+            if ch.cards[ci].revealed and ch.cards[ci].suit == ch.cards[ci - 1].suit and ch.cards[ci].rank + 1 == ch.cards[ci - 1].rank:
+                current_series += 1
+            else:
+                break
+
+            if current_series == 13:
+                completed_label.complete(ch.cards[ci].suit)
+                ch.cards = ch.cards[:-13]
+                break
+
 
 
 # rl.SetConfigFlags(rl.FLAG_WINDOW_RESIZABLE | rl.FLAG_WINDOW_MAXIMIZED)
@@ -225,12 +270,13 @@ hand = HandCardHolder()
 card_holders = []
 all_cards = []
 deal_button = DealButton()
+completed_label = CompletedLabel(1)
 
 for ch_i in range(10):
     card_holders.append(CardHolder(ch_i * g_element_width + (ch_i + 1) * g_gap_size))
 
-all_cards.extend(generate_standard_deck(2))
-all_cards.extend(generate_standard_deck(2))
+all_cards.extend(generate_standard_deck(1))
+all_cards.extend(generate_standard_deck(1))
 shuffle(all_cards)
 
 ch_i = 0
@@ -256,7 +302,7 @@ while not rl.WindowShouldClose():
     # check if we have any cards selected
     if not hand.occupied:
         for ch in card_holders:
-            for ci in range(len(ch.cards) - 1, 0, -1):
+            for ci in range(len(ch.cards) - 1, -1, -1):
                 if ch.cards[ci].is_clicked():
                     hand.set_occupied(card_holders.index(ch))
 
@@ -303,6 +349,7 @@ while not rl.WindowShouldClose():
         if not hand.occupied:
             ch.reveal_bottom_card()
 
+    completed_label.draw()
     deal_button.draw()
 
     hand.draw_cards()
@@ -311,6 +358,8 @@ while not rl.WindowShouldClose():
         deal_button.deal()
         for i in range(10):
             card_holders[i].add_card(all_cards.pop())
+
+    check_holders_complete_series(card_holders)
 
     rl.EndDrawing()
 rl.CloseWindow()
