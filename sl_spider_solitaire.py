@@ -41,7 +41,6 @@ class Card:
         self.suit = suit
         self.rank = rank
         self.revealed = False
-        self.selected = False
         self.x = x
         self.y = y
 
@@ -62,17 +61,11 @@ class Card:
         if self.revealed:
             rl.DrawText(card_text, self.x + 1, self.y + 1, g_font_size, suit_colours[self.suit])
 
-    def reveal(self):
+    def set_revealed(self):
         self.revealed = True
 
-    def hide(self):
+    def set_hidden(self):
         self.revealed = False
-
-    def select(self):
-        self.selected = True
-
-    def deselect(self):
-        self.selected = False
 
     def is_clicked(self):
         rect = (self.x, self.y, g_element_width, g_element_height)
@@ -105,8 +98,9 @@ class CardHolder:
 
     def reveal_bottom_card(self):
         if self.cards and (not self.cards[-1].revealed):
-            self.cards[-1].reveal()
+            self.cards[-1].set_revealed()
 
+    # TODO: check if card rectangles collide instead of mouse pointer
     def is_released(self):
         rect = (self.x, self.y, g_element_width, g_window_height)
         mouse_pos = rl.GetMousePosition()
@@ -122,15 +116,21 @@ class HandCardHolder:
         self.cards = []
         self.vertical_offset = g_font_size
         self.occupied = False
+        self.card_source_index = -1
 
     def add_card(self, card):
         self.cards.append(card)
 
-    def set_occupied(self):
+    def set_occupied(self, csi):
         self.occupied = True
+        self.card_source_index = csi
 
     def set_unoccupied(self):
         self.occupied = False
+        self.card_source_index = -1
+
+    def get_csi(self):
+        return self.card_source_index
 
     def draw_cards(self):
         i = 0
@@ -208,6 +208,14 @@ def shuffle(deck):
 
         deck[i], deck[r] = deck[r], deck[i]
 
+# for picking up multiple cards
+def is_valid_series(cards):
+    for i in range(len(cards) - 1):
+        if cards[i].suit != cards[i + 1].suit or cards[i].rank - 1 != cards[i + 1].rank:
+            return False
+
+    return True
+
 
 # rl.SetConfigFlags(rl.FLAG_WINDOW_RESIZABLE | rl.FLAG_WINDOW_MAXIMIZED)
 rl.InitWindow(g_window_width, g_window_height, b"sl spider solitaire")
@@ -243,40 +251,51 @@ while not rl.WindowShouldClose():
     rl.ClearBackground(rl.DARKGREEN)
 
     selected_card_index = -1
+    selected_holder_index = -1
 
+    # check if we have any cards selected
     if not hand.occupied:
         for ch in card_holders:
             for ci in range(len(ch.cards) - 1, 0, -1):
                 if ch.cards[ci].is_clicked():
-                    ch.cards[ci].select()
-                    hand.set_occupied()
-
-                    print(ch.cards[ci].suit, ch.cards[ci].rank)
+                    hand.set_occupied(card_holders.index(ch))
 
                     selected_card_index = ci
+                    selected_holder_index = card_holders.index(ch)
                     break
 
-            print("end selected cards")
+        if selected_card_index > -1 and is_valid_series(card_holders[selected_holder_index].cards[selected_card_index:]):
+            for ci in range(selected_card_index, len(card_holders[selected_holder_index].cards)):
+                hand.add_card(card_holders[selected_holder_index].cards.pop())
 
-            if selected_card_index > -1:
-                for ci in range(selected_card_index, len(ch.cards)):
-                    hand.add_card(ch.cards.pop())
+            hand.cards.reverse()
+            selected_card_index = -1
+        else:
+            hand.set_unoccupied()
+            selected_card_index = -1
 
-                hand.cards.reverse()
-                selected_card_index = -1
-
-    if hand.occupied:
+    # if the hand is occupied but we released the the mouse button
+    # the cards must be released too
+    if hand.occupied and rl.IsMouseButtonReleased(rl.MOUSE_LEFT_BUTTON):
         for ch in card_holders:
             if ch.is_released():
-                while len(hand.cards):
-                    hand.cards[-1].deselect()
-                    ch.add_card(hand.cards.pop())
+                if len(ch.cards) == 0 or (ch.cards[-1].rank - 1 == hand.cards[0].rank):
+                    hand.cards.reverse()
 
-                hand.set_unoccupied()
+                    while len(hand.cards):
+                        ch.add_card(hand.cards.pop())
 
+                    hand.set_unoccupied()
+
+        # if the hand is still occupied
         # pass the cards back over to the original card holder
-        if rl.IsMouseButtonReleased(rl.MOUSE_LEFT_BUTTON):
-            pass
+        if hand.occupied:
+            hand.cards.reverse()
+
+            while len(hand.cards):
+                card_holders[hand.get_csi()].add_card(hand.cards.pop())
+
+            hand.set_unoccupied()
 
     for ch in card_holders:
         ch.draw_cards()
