@@ -1,49 +1,7 @@
 import raylib as rl
-import random
+import copy
+
 from core import *
-
-class Card:
-    def __init__(self, suit, rank, x, y):
-        self.suit = suit
-        self.rank = rank
-        self.revealed = False
-        self.x = x
-        self.y = y
-
-    def set_pos(self, x, y):
-        self.x = x
-        self.y = y
-
-    def draw(self):
-        card_text = f"{ranks[self.rank]} {suits[self.suit]}".encode("utf-8")
-        card_background = rl.GRAY
-
-        if self.revealed:
-            card_background = rl.WHITE
-
-        rl.DrawRectangle(self.x, self.y, RlWindow.n_el_width, RlWindow.n_el_height, card_background)
-        rl.DrawRectangleLines(self.x, self.y, RlWindow.n_el_width, RlWindow.n_el_height, rl.BLACK)
-        
-        if self.revealed:
-            rl.DrawText(card_text, self.x + 1, self.y + 1, RlWindow.n_font_size, suit_colours[self.suit])
-
-    def set_revealed(self):
-        self.revealed = True
-
-    def set_hidden(self):
-        self.revealed = False
-
-    def is_clicked(self):
-        rect = (self.x, self.y, RlWindow.n_el_width, RlWindow.n_el_height)
-        mouse_pos = rl.GetMousePosition()
-
-        if self.revealed:
-            if rl.CheckCollisionPointRec(mouse_pos, rect):
-                if rl.IsMouseButtonPressed(rl.MOUSE_LEFT_BUTTON):
-                    return True
-
-        return False
-
 
 class CardHolder:
     def __init__(self, x):
@@ -114,41 +72,6 @@ class HandCardHolder:
             card.draw()
             i += 1
 
-class DealButton:
-    def __init__(self):
-        self.remaining_deals = 5
-        self.width = int(RlWindow.n_el_width * 1.5)
-        self.height = int(RlWindow.n_el_height / 4)
-        self.x_pos = RlWindow.n_width - self.width - RlWindow.n_gap_size
-        self.y_pos = RlWindow.n_height - self.height - RlWindow.n_gap_size
-
-    def reset(self):
-        self.remaining_deals = 5
-
-    def draw(self):
-        deal_text = f"Deal Cards\n({self.remaining_deals} remaining)".encode("utf-8")
-
-        rl.DrawRectangle(self.x_pos, self.y_pos, self.width, self.height, rl.GRAY)
-        rl.DrawRectangleLines(self.x_pos, self.y_pos, self.width, self.height, rl.BLACK)
-
-        rl.DrawText(deal_text, self.x_pos + 1, self.y_pos + 1, RlWindow.n_font_size, rl.WHITE)
-
-    def can_deal(self):
-        return self.remaining_deals > 0
-
-    def deal(self):
-        self.remaining_deals -= 1
-
-    def is_clicked(self):
-        rect = (self.x_pos, self.y_pos, self.width, self.height)
-        mouse_pos = rl.GetMousePosition()
-
-        if rl.CheckCollisionPointRec(mouse_pos, rect):
-            if rl.IsMouseButtonPressed(rl.MOUSE_LEFT_BUTTON):
-                return True
-
-        return False
-
 # traditionally you show the completed series with a king from
 # the respective suit
 # but we're cheap here
@@ -163,6 +86,9 @@ class CompletedLabel:
 
     def reset(self, current_suits):
         self.suits = { suit: 0 for suit in range(current_suits) }
+
+        self.height = RlWindow.n_font_size * (current_suits + 1) + RlWindow.n_gap_size
+        self.y_pos = RlWindow.n_height - self.height - RlWindow.n_gap_size
 
     def complete(self, suit):
         self.suits[suit] += 1
@@ -183,58 +109,77 @@ class CompletedLabel:
 
         rl.DrawText(text, self.x_pos + 1, self.y_pos + 1, RlWindow.n_font_size, rl.WHITE)
 
-def generate_standard_deck(n_suits):
-    deck_suits = []
+class GenericButton:
+    def __init__(self, _x, _y, _width, _height, _text, _func):
+        self.x = _x
+        self.y = _y
+        self.width = _width
+        self.height = _height
+        self.text = _text.encode("utf-8")
 
-    if n_suits == 1:
-        for i in range(4):
-            deck_suits.append(0)
-    elif n_suits == 2:
-        for i in range(2):
-            deck_suits.append(0)
-            deck_suits.append(1)
-    else:
-        for i in range(4):
-            deck_suits.append(i)
+        self.func = _func
 
-    deck = []
+    def exec_func(self):
+        self.func()
 
-    for suit in deck_suits:
-        for rank in ranks:
-            deck.append(Card(suit, rank, 0, 0))
+    def draw(self):
+        rl.DrawRectangle(self.x, self.y, self.width, self.height, rl.GRAY)
+        rl.DrawRectangleLines(self.x, self.y, self.width, self.height, rl.BLACK)
 
-    return deck
+        rl.DrawText(self.text, self.x + 1, self.y + 1, RlWindow.n_font_size, rl.WHITE)
 
-# deck is a list so no reason to return
-def shuffle(deck):
-    for i in range(len(deck)):
-        r = random.randint(0, len(deck) - 1)
+    def is_clicked(self):
+        rect = (self.x, self.y, self.width, self.height)
+        mouse_pos = rl.GetMousePosition()
 
-        deck[i], deck[r] = deck[r], deck[i]
+        if rl.CheckCollisionPointRec(mouse_pos, rect):
+            if rl.IsMouseButtonPressed(rl.MOUSE_LEFT_BUTTON):
+                return True
 
-# for picking up multiple cards
-def is_valid_series(cards):
-    if len(cards) > 1:
-        for i in range(len(cards) - 1):
-            if cards[i].suit != cards[i + 1].suit or cards[i].rank - 1 != cards[i + 1].rank:
-                return False
+        return False
 
-    return True
+class DealButton(GenericButton):
+    def __init__(self):
+        self.remaining_deals = 5
 
-def check_holders_complete_series(card_holders):
-    for ch in card_holders:
-        current_series = 1
+        super().__init__(
+            RlWindow.n_width - int(RlWindow.n_el_width * 1.5) - RlWindow.n_gap_size, 
+            RlWindow.n_height - RlWindow.n_font_size * 2 - RlWindow.n_gap_size, 
+            int(RlWindow.n_el_width * 1.5), 
+            RlWindow.n_font_size * 2, 
+            f"Deal Cards\n({self.remaining_deals} remaining)",
+            None
+        )
 
-        for ci in range(len(ch.cards) - 1, 0, -1):
-            if ch.cards[ci].revealed and ch.cards[ci].suit == ch.cards[ci - 1].suit and ch.cards[ci].rank + 1 == ch.cards[ci - 1].rank:
-                current_series += 1
-            else:
-                break
+    def update_text(self):
+        self.text = f"Deal Cards\n({self.remaining_deals} remaining)".encode("utf-8")
 
-            if current_series == 13:
-                completed_label.complete(ch.cards[ci].suit)
-                ch.cards = ch.cards[:-13]
-                break
+    def reset(self):
+        self.remaining_deals = 5
+        self.update_text()
+
+    def update(self):
+        self.remaining_deals -= 1
+        self.update_text()
+
+    def can_deal(self):
+        return self.remaining_deals > 0
+
+class NewGameButton(GenericButton):
+    def __init__(self, _x, _y, new_game_func, _n_suits):
+        self.n_suits = _n_suits
+
+        super().__init__(
+            _x, 
+            _y, 
+            RlWindow.n_el_width, 
+            RlWindow.n_font_size * 2, 
+            f"New Game\n({self.n_suits} suits)", 
+            new_game_func
+        )
+
+    def exec_func(self):
+        self.func(self.n_suits)
 
 class SpiderSolitaire(GameTemplate):
     def __init__(self, _n_suits):
@@ -252,7 +197,59 @@ class SpiderSolitaire(GameTemplate):
 
         self.v_states = []
 
+        self.new_game_buttons = []
+
+        self.new_game_buttons.append(NewGameButton(
+            self.completed_label.width + RlWindow.n_gap_size * 2,
+            RlWindow.n_height - RlWindow.n_font_size * 2 - RlWindow.n_gap_size,
+            self.new_game,
+            1
+        ))
+
+        self.new_game_buttons.append(NewGameButton(
+            self.completed_label.width + RlWindow.n_el_width + RlWindow.n_gap_size * 3,
+            RlWindow.n_height - RlWindow.n_font_size * 2 - RlWindow.n_gap_size,
+            self.new_game,
+            2
+        ))
+
+        self.new_game_buttons.append(NewGameButton(
+            self.completed_label.width + RlWindow.n_el_width * 2 + RlWindow.n_gap_size * 4,
+            RlWindow.n_height - RlWindow.n_font_size * 2 - RlWindow.n_gap_size,
+            self.new_game,
+            4
+        ))
+
+        self.undo_button = GenericButton(
+            self.completed_label.width + RlWindow.n_el_width * 3 + RlWindow.n_gap_size * 5,
+            RlWindow.n_height - RlWindow.n_font_size - RlWindow.n_gap_size,
+            RlWindow.n_el_width,
+            RlWindow.n_font_size,
+            "Undo",
+            self.set_last_state
+        )
+
         self.new_game(_n_suits)
+
+    def save_state(self):
+        self.v_states.append((
+            copy.deepcopy(self.card_holders),
+            copy.deepcopy(self.all_cards),
+            copy.deepcopy(self.deal_button),
+            copy.deepcopy(self.completed_label)
+        ))
+
+    # gotta pop twice cause the first popped one is the current state
+    def set_last_state(self):
+        if len(self.v_states) > 1:
+            self.v_states.pop()
+
+            last_state = self.v_states[-1]
+
+            self.card_holders    = copy.deepcopy(last_state[0])
+            self.all_cards       = copy.deepcopy(last_state[1])
+            self.deal_button     = copy.deepcopy(last_state[2])
+            self.completed_label = copy.deepcopy(last_state[3])
 
     def new_game(self, _n_suits):
         self.n_suits = _n_suits
@@ -262,6 +259,8 @@ class SpiderSolitaire(GameTemplate):
         self.all_cards.clear()
         self.deal_button.reset()
         self.completed_label.reset(_n_suits)
+
+        self.v_states.clear()
 
         for ch_i in range(10):
             self.card_holders.append(CardHolder(ch_i * RlWindow.n_el_width + (ch_i + 1) * RlWindow.n_gap_size))
@@ -278,19 +277,28 @@ class SpiderSolitaire(GameTemplate):
             self.card_holders[ch_i].add_card(self.all_cards.pop())
             ch_i += 1
 
-        ch_i = 0
-
         for ch in self.card_holders:
             ch.reveal_bottom_card()
 
-        self.b_gameover = False
+        self.save_state()
+
+    def game_over(self):
+        return self.completed_label.get_total_completed == 8
+
+    def deal_cards(self):
+        for i in range(len(self.card_holders)):
+            self.card_holders[i].add_card(self.all_cards.pop())
+
+    def remove_complete_series(self, complete_series):
+        for chi, ci in complete_series:
+            self.completed_label.complete(self.card_holders[chi].cards[ci].suit)
+            self.card_holders[chi].cards = self.card_holders[chi].cards[:-13]
 
     def draw(self):
-        if self.completed_label.get_total_completed == 8:
-            self.b_gameover = True
+        b_moved = False
 
         # logic
-        if not self.b_gameover:
+        if not self.game_over():
             selected_card_index = -1
             selected_holder_index = -1
 
@@ -326,7 +334,13 @@ class SpiderSolitaire(GameTemplate):
                             while len(self.hand.cards):
                                 ch.add_card(self.hand.cards.pop())
 
+                            # i.e. it was dropped back where it came from
+                            if self.hand.get_csi() != self.card_holders.index(ch):
+                                b_moved = True
+
                             self.hand.set_unoccupied()
+
+                            break
 
                 # if the hand is still occupied
                 # pass the cards back over to the original card holder
@@ -338,14 +352,28 @@ class SpiderSolitaire(GameTemplate):
 
                     self.hand.set_unoccupied()
 
+            complete_series = check_holders_complete_series(self.card_holders)
+
+            if len(complete_series) > 0:
+                self.remove_complete_series(complete_series)
+                b_moved = True
+
             # we can only deal with an unoccupied hand
             if not self.hand.occupied:
                 if self.deal_button.is_clicked() and self.deal_button.can_deal():
-                    self.deal_button.deal()
-                    for i in range(10):
-                        self.card_holders[i].add_card(self.all_cards.pop())
+                    self.deal_cards()
+                    self.deal_button.update()
+                    b_moved = True
 
-            check_holders_complete_series(self.card_holders)
+                for new_game_btn in self.new_game_buttons:
+                    if new_game_btn.is_clicked():
+                        new_game_btn.exec_func()
+
+                if self.undo_button.is_clicked():
+                    self.undo_button.exec_func()
+
+        if b_moved:
+            self.save_state()
 
         # the actual drawing
         for ch in self.card_holders:
@@ -355,6 +383,12 @@ class SpiderSolitaire(GameTemplate):
                 ch.reveal_bottom_card()
 
         self.completed_label.draw()
+        
+        for new_game_btn in self.new_game_buttons:
+            new_game_btn.draw()
+
+        self.undo_button.draw()
+
         self.deal_button.draw()
 
         self.hand.draw_cards()
