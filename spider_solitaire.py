@@ -27,9 +27,9 @@ class CardHolder:
     # TODO: check if card rectangles collide instead of mouse pointer
     def is_released(self):
         rect = (self.x, self.y, RlWindow.n_el_width, RlWindow.n_height)
-        mouse_pos = rl.GetMousePosition()
+        mouse_pos = RlWindow.GetVirtualMousePosition()
 
-        if rl.CheckCollisionPointRec(mouse_pos, rect):
+        if rl.CheckCollisionPointRec(mouse_pos.get_raw(), rect):
             if rl.IsMouseButtonReleased(rl.MOUSE_LEFT_BUTTON):
                 return True
 
@@ -63,7 +63,7 @@ class HandCardHolder:
     def draw_cards(self):
         i = 0
 
-        mouse_pos = rl.GetMousePosition()
+        mouse_pos = RlWindow.GetVirtualMousePosition()
         x = int(mouse_pos.x)
         y = int(mouse_pos.y)
 
@@ -130,9 +130,9 @@ class GenericButton:
 
     def is_clicked(self):
         rect = (self.x, self.y, self.width, self.height)
-        mouse_pos = rl.GetMousePosition()
+        mouse_pos = RlWindow.GetVirtualMousePosition()
 
-        if rl.CheckCollisionPointRec(mouse_pos, rect):
+        if rl.CheckCollisionPointRec(mouse_pos.get_raw(), rect):
             if rl.IsMouseButtonPressed(rl.MOUSE_LEFT_BUTTON):
                 return True
 

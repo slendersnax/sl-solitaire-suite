@@ -27,6 +27,14 @@ ranks = {
     13: "K"
 }
 
+class Vector2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def get_raw(self):
+        return (self.x, self.y)
+
 class RlWindow:
     n_width = 1280
     n_height = 720
@@ -38,6 +46,31 @@ class RlWindow:
     # qol
     n_font_size = n_width // 60
     n_gap_size = n_width // 128
+
+    @staticmethod
+    def GetVirtualMousePosition():
+        screen_w = rl.GetScreenWidth()
+        screen_h = rl.GetScreenHeight()
+
+        scale = min(screen_w / RlWindow.n_width, screen_h / RlWindow.n_height)
+
+        draw_w = int(RlWindow.n_width * scale)
+        draw_h = int(RlWindow.n_height * scale)
+
+        offset_x = (screen_w - draw_w) // 2
+        offset_y = (screen_h - draw_h) // 2
+
+        mouse = rl.GetMousePosition()
+
+        # If in letterbox region, return safe dummy coordinates
+        if not (offset_x <= mouse.x <= offset_x + draw_w and offset_y <= mouse.y <= offset_y + draw_h):
+            return Vector2(-100, -100)
+
+        # Convert real to virtual
+        return Vector2(
+            (mouse.x - offset_x) / scale,
+            (mouse.y - offset_y) / scale
+        )
 
     def __init__(self):
         pass
@@ -86,7 +119,7 @@ class GameTemplate:
 
             # --- Draw scaled texture to the screen ---
             rl.BeginDrawing()
-            rl.ClearBackground(rl.BLACK)
+            rl.ClearBackground(rl.DARKGREEN)
 
             rl.DrawTexturePro(target.texture, source, dest, (0, 0), 0.0, rl.WHITE)
 
@@ -127,10 +160,10 @@ class Card:
 
     def is_clicked(self):
         rect = (self.x, self.y, RlWindow.n_el_width, RlWindow.n_el_height)
-        mouse_pos = rl.GetMousePosition()
+        mouse_pos = RlWindow.GetVirtualMousePosition()
 
         if self.revealed:
-            if rl.CheckCollisionPointRec(mouse_pos, rect):
+            if rl.CheckCollisionPointRec(mouse_pos.get_raw(), rect):
                 if rl.IsMouseButtonPressed(rl.MOUSE_LEFT_BUTTON):
                     return True
 
