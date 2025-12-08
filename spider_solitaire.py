@@ -15,7 +15,7 @@ class CardHolder:
 
     def draw(self):
         # outline
-        rl.DrawRectangleLines(self.x, self.y, RlWindow.n_el_width, RlWindow.n_el_height, rl.BLACK)
+        rl.DrawRectangleLines(self.x, self.y, RlWindow.n_el_width, RlWindow.n_el_height, rl.GRAY)
 
         i = 0
         for card in self.cards:
@@ -240,9 +240,9 @@ class SpiderSolitaire(GameTemplate):
 
         self.undo_button = GenericButton(
             self.completed_label.width + RlWindow.n_el_width * 3 + RlWindow.n_gap_size * 5,
-            RlWindow.n_height - RlWindow.n_font_size - RlWindow.n_gap_size,
+            RlWindow.n_height - RlWindow.n_font_size * 2 - RlWindow.n_gap_size,
             RlWindow.n_el_width,
-            RlWindow.n_font_size,
+            RlWindow.n_font_size * 2,
             "Undo",
             self.set_last_state
         )
