@@ -13,7 +13,10 @@ class CardHolder:
     def add_card(self, card):
         self.cards.append(card)
 
-    def draw_cards(self):
+    def draw(self):
+        # outline
+        rl.DrawRectangleLines(self.x, self.y, RlWindow.n_el_width, RlWindow.n_el_height, rl.BLACK)
+
         i = 0
         for card in self.cards:
             card.set_pos(self.x, self.y + i * self.vertical_offset)
@@ -24,12 +27,21 @@ class CardHolder:
         if self.cards and (not self.cards[-1].revealed):
             self.cards[-1].set_revealed()
 
-    # TODO: check if card rectangles collide instead of mouse pointer
     def is_released(self):
-        rect = (self.x, self.y, RlWindow.n_el_width, RlWindow.n_height)
         mouse_pos = RlWindow.GetVirtualMousePosition()
 
-        if rl.CheckCollisionPointRec(mouse_pos.get_raw(), rect):
+        rect = (self.x, self.y, RlWindow.n_el_width, RlWindow.n_height)
+        mouse_rect = (mouse_pos.x, mouse_pos.y, RlWindow.n_gap_size - 1, 2)
+
+        # we're doing a naughty thang here
+        # checking collision against the mouse's position works, but it may not be intuitive
+        # in all cases, because it only checks the mouse's top left x,y (as intended)
+        # however, if the rest of the mouse is hovering over a valid card holder, it should drop
+        # the held cards there
+        # so we get the smallest width that can only overlap one card holder, which is
+        # the global gap size - 1 :D
+        # the height doesn't really matter as card holders are infinitely tall anyway
+        if rl.CheckCollisionRecs(mouse_rect, rect):
             if rl.IsMouseButtonReleased(rl.MOUSE_LEFT_BUTTON):
                 return True
 
@@ -391,7 +403,7 @@ class SpiderSolitaire(GameTemplate):
 
         # the actual drawing
         for ch in self.card_holders:
-            ch.draw_cards()
+            ch.draw()
 
             if not self.hand.occupied:
                 ch.reveal_bottom_card()

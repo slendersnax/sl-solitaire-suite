@@ -127,6 +127,7 @@ class GameTemplate:
 
         rl.CloseWindow()
 
+# card game components
 class Card:
     def __init__(self, suit, rank, x, y):
         self.suit = suit
@@ -169,6 +170,7 @@ class Card:
 
         return False
 
+# utility functions
 def generate_standard_deck(n_suits):
     deck_suits = []
 
