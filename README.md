@@ -4,7 +4,7 @@ an offline solitaire suite game
 
 ## installation
 
-**Warning:** at the moment only Linux binaries are provided
+**Warning:** at the moment only Linux executables are provided
 
 Head over to the [releases](https://github.com/slendersnax/sl-solitaire-suite/releases) page and download the latest executable for your system - this is ready to use so just put it wherever, double click, and enjoy. :)
 
@@ -12,14 +12,14 @@ Head over to the [releases](https://github.com/slendersnax/sl-solitaire-suite/re
 
 You have to install all the dependencies and then run the main file using Python (which means you need Python installed too). That would look like this:
 
-```bash
+```cmd
 pip install -r requirements.txt
 python sl_solitaire.py
 ```
 
 ## to-do
 
-Yhis is still a work-in-progress. See the table below for the current status:
+This is still a work-in-progress. See the table below for the current status:
 
 - General:
     - [ ] prettier cards
