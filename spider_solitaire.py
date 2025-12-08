@@ -42,6 +42,9 @@ class HandCardHolder:
         self.occupied = False
         self.card_source_index = -1
 
+        self.card_x_diff = -1
+        self.card_y_diff = -1
+
     def reset(self):
         self.cards.clear()
         self.set_unoccupied()
@@ -57,6 +60,9 @@ class HandCardHolder:
         self.occupied = False
         self.card_source_index = -1
 
+        self.card_x_diff = -1
+        self.card_y_diff = -1
+
     def get_csi(self):
         return self.card_source_index
 
@@ -67,10 +73,18 @@ class HandCardHolder:
         x = int(mouse_pos.x)
         y = int(mouse_pos.y)
 
-        for card in self.cards:
-            card.set_pos(x, y + i * self.vertical_offset)
-            card.draw()
-            i += 1
+        if self.occupied:
+            card0_x = self.cards[0].x
+            card0_y = self.cards[0].y
+
+            if self.card_x_diff == -1:
+                self.card_x_diff = x - card0_x
+                self.card_y_diff = y - card0_y
+
+            for card in self.cards:
+                card.set_pos(x - self.card_x_diff, y - self.card_y_diff + i * self.vertical_offset)
+                card.draw()
+                i += 1
 
 # traditionally you show the completed series with a king from
 # the respective suit
