@@ -27,21 +27,13 @@ class CardHolder:
         if self.cards and (not self.cards[-1].revealed):
             self.cards[-1].set_revealed()
 
-    def is_released(self):
+    def is_released(self, card):
         mouse_pos = RlWindow.GetVirtualMousePosition()
 
         rect = (self.x, self.y, RlWindow.n_el_width, RlWindow.n_height)
-        mouse_rect = (mouse_pos.x, mouse_pos.y, RlWindow.n_gap_size - 1, 2)
+        card_rect = (card.x, card.y, RlWindow.n_el_width, RlWindow.n_height)
 
-        # we're doing a naughty thang here
-        # checking collision against the mouse's position works, but it may not be intuitive
-        # in all cases, because it only checks the mouse's top left x,y (as intended)
-        # however, if the rest of the mouse is hovering over a valid card holder, it should drop
-        # the held cards there
-        # so we get the smallest width that can only overlap one card holder, which is
-        # the global gap size - 1 :D
-        # the height doesn't really matter as card holders are infinitely tall anyway
-        if rl.CheckCollisionRecs(mouse_rect, rect):
+        if rl.CheckCollisionRecs(card_rect, rect):
             if rl.IsMouseButtonReleased(rl.MOUSE_LEFT_BUTTON):
                 return True
 
@@ -352,21 +344,39 @@ class SpiderSolitaire(GameTemplate):
             # if the hand is occupied but we released the the mouse button
             # the cards must be released too
             if self.hand.occupied and rl.IsMouseButtonReleased(rl.MOUSE_LEFT_BUTTON):
+                # if by some miracle we have two card holders next to each other we have to check
+                # which one overlaps more with our held cards
+                # sorting is overkill for this but who cares
+                # TODO: do away with this list cause we can compare the two holders' distance
+                # directly in the loop below
+                possible_drops = []
+
                 for ch in self.card_holders:
-                    if ch.is_released():
-                        if len(ch.cards) == 0 or (ch.cards[-1].rank - 1 == self.hand.cards[0].rank):
-                            self.hand.cards.reverse()
+                    if ch.is_released(self.hand.cards[0]):
+                        # bit wordy, TODO here to shorten it maybe?
+                        # anyway, conditions:
+                        # empty card holder
+                        # the rank of the holder's last card and hand's first card fit one after another in a series
+                        # the holder isn't the one where we picked up the cards from
+                        if (len(ch.cards) == 0 or (ch.cards[-1].revealed and ch.cards[-1].rank - 1 == self.hand.cards[0].rank) \
+                            and self.card_holders.index(ch) != self.hand.get_csi()):
+                            possible_drops.append(ch)
 
-                            while len(self.hand.cards):
-                                ch.add_card(self.hand.cards.pop())
 
-                            # i.e. it was dropped back where it came from
-                            if self.hand.get_csi() != self.card_holders.index(ch):
-                                b_moved = True
+                if len(possible_drops) > 1:
+                    possible_drops.sort(key=lambda ch: abs(ch.x - self.hand.cards[0].x))
 
-                            self.hand.set_unoccupied()
+                if len(possible_drops) > 0:
+                    self.hand.cards.reverse()
 
-                            break
+                    while len(self.hand.cards):
+                        possible_drops[0].add_card(self.hand.cards.pop())
+
+                    # i.e. it was dropped back where it came from
+                    if self.hand.get_csi() != self.card_holders.index(possible_drops[0]):
+                        b_moved = True
+
+                    self.hand.set_unoccupied()
 
                 # if the hand is still occupied
                 # pass the cards back over to the original card holder
